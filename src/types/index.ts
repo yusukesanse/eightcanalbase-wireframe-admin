@@ -111,3 +111,60 @@ export interface UserQuestProgress {
   completed: boolean;
   completedAt?: string;
 }
+
+// ─── スキル・プロフィール拡張 ─────────────────────────────────────────────────
+
+export interface SkillCategory {
+  id: string;
+  label: string;
+  skills: string[];
+}
+
+export const SKILL_CATEGORIES: SkillCategory[] = [
+  {
+    id: "video",
+    label: "映像・写真・音楽",
+    skills: ["映像制作", "動画編集", "写真撮影", "ドローン撮影", "アニメーション", "音楽制作", "ナレーション"],
+  },
+  {
+    id: "design",
+    label: "デザイン・クリエイティブ",
+    skills: ["グラフィックデザイン", "UI/UXデザイン", "イラスト", "ブランディング", "3Dモデリング", "DTP"],
+  },
+  {
+    id: "dev",
+    label: "Web・IT開発",
+    skills: ["Webサイト制作", "アプリ開発", "システム開発", "EC構築", "WordPress"],
+  },
+  {
+    id: "business",
+    label: "マーケ・ビジネス支援",
+    skills: ["SNS運用", "Web広告", "SEO対策", "ライティング", "翻訳", "コンサルティング", "PR・広報"],
+  },
+];
+
+export const ALL_PRESET_SKILLS = SKILL_CATEGORIES.flatMap((c) => c.skills);
+
+export interface MemberProfile {
+  catchphrase: string;
+  skills: string[];
+  services: string[];
+  contactInfo: string;
+}
+
+// ─── 掲示板投稿 ─────────────────────────────────────────────────────────────
+
+export type PostType = "offer" | "request";
+
+export interface TimelinePost {
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorPictureUrl: string;
+  type: PostType;
+  content: string;
+  tags: string[];
+  likes: string[];
+  commentCount: number;
+  createdAt: string;
+}

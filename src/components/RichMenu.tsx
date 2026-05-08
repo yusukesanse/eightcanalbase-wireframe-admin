@@ -7,7 +7,7 @@ import clsx from "clsx";
 const MENUS = [
   {
     href: "/reservation",
-    label: "施設予約",
+    label: "予約",
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <rect x="2" y="3" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="1.5"/>
@@ -16,37 +16,41 @@ const MENUS = [
     ),
   },
   {
-    href: "/events",
-    label: "イベント",
+    href: "/info",
+    label: "Info",
+    match: ["/info", "/events", "/quests", "/news"],
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <path d="M11 2l2 6h6.5l-5.5 4 2 6L11 14 5.5 18l2-6L2 8h6.5L11 2z"
-          stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <circle cx="11" cy="11" r="9" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M11 10v5M11 7.5v0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
       </svg>
     ),
   },
   {
-    href: "/quests",
-    label: "クエスト",
+    href: "/members",
+    label: "メンバー",
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M11 7v4l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M8 10a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M1 19c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M15 3.5a3.5 3.5 0 010 6.5M17 13c2.5.5 4 2.5 4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     ),
   },
   {
-    href: "/news",
-    label: "ニュース",
+    href: "/timeline",
+    label: "掲示板",
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <path d="M4 5h14M4 10h10M4 15h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M3 4h16a1 1 0 011 1v10a1 1 0 01-1 1H6l-3 3V5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <path d="M7 9h8M7 12h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     ),
   },
   {
-    href: "/profile",
-    label: "ユーザー",
+    href: "/mypage",
+    label: "マイページ",
+    match: ["/mypage", "/profile"],
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <path d="M11 3a4 4 0 014 4v0a4 4 0 01-4 4v0a4 4 0 01-4-4v0a4 4 0 014-4z" stroke="currentColor" strokeWidth="1.5" />
@@ -62,7 +66,8 @@ export function RichMenu() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 grid grid-cols-5 z-50">
       {MENUS.map((menu) => {
-        const active = pathname.startsWith(menu.href);
+        const paths = (menu as { match?: string[] }).match || [menu.href];
+        const active = paths.some((p) => pathname.startsWith(p));
         return (
           <Link
             key={menu.href}
@@ -70,14 +75,14 @@ export function RichMenu() {
             className={clsx(
               "flex flex-col items-center justify-center py-2 gap-1 text-xs transition-colors",
               active
-                ? "text-[#06C755] font-medium"
+                ? "text-[#A5C1C8] font-medium"
                 : "text-gray-400 hover:text-gray-600"
             )}
           >
             <span
               className={clsx(
                 "transition-colors",
-                active ? "text-[#06C755]" : "text-gray-400"
+                active ? "text-[#A5C1C8]" : "text-gray-400"
               )}
             >
               {menu.icon}
