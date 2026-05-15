@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { NufEvent, Quest, NewsItem } from "@/types";
+import clsx from "clsx";
 import dayjs from "dayjs";
 import "dayjs/locale/ja";
 dayjs.locale("ja");
@@ -85,7 +86,7 @@ export default function InfoPage() {
 }
 
 /* ═══════════════════════════════════════════
-   イベントタブ
+   イベントタブ（タイムライン型）
    ═══════════════════════════════════════════ */
 
 const EVENT_CATEGORY_LABELS: Record<string, string> = {
@@ -95,6 +96,15 @@ const EVENT_CATEGORY_LABELS: Record<string, string> = {
   info: "お知らせ",
 };
 
+const EVENT_CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  networking: { bg: "bg-blue-100", text: "text-blue-700" },
+  workshop:   { bg: "bg-[#A5C1C8]/20", text: "text-[#231714]" },
+  social:     { bg: "bg-[#B0E401]/15", text: "text-[#231714]" },
+  info:       { bg: "bg-gray-100", text: "text-[#231714]" },
+};
+
+type TimeFilter = "all" | "upcoming" | "past";
+
 function EventsTab({
   events,
   router,
@@ -102,57 +112,221 @@ function EventsTab({
   events: (NufEvent & { goodCount: number })[];
   router: ReturnType<typeof useRouter>;
 }) {
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("upcoming");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  // カテゴリ一覧を抽出
+  const categories = useMemo(() => {
+    const set = new Set(events.map((e) => e.category));
+    return Array.from(set);
+  }, [events]);
+
+  // フィルタリング・ソート・月別グルーピング
+  const grouped = useMemo(() => {
+    const now = dayjs();
+
+    // 時期フィルタ
+    let filtered = events;
+    if (timeFilter === "upcoming") {
+      filtered = events.filter((e) => dayjs(e.endAt).isAfter(now));
+    } else if (timeFilter === "past") {
+      filtered = events.filter((e) => dayjs(e.endAt).isBefore(now));
+    }
+
+    // カテゴリフィルタ
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter((e) => e.category === categoryFilter);
+    }
+
+    // ソート: 今後→古い順（直近が上）, 過去/すべて→新しい順
+    const sorted = Array.from(filtered).sort((a, b) => {
+      const diff = dayjs(a.startAt).unix() - dayjs(b.startAt).unix();
+      return timeFilter === "upcoming" ? diff : -diff;
+    });
+
+    // 月別グルーピング
+    const map = new Map<string, (NufEvent & { goodCount: number })[]>();
+    for (const ev of sorted) {
+      const key = dayjs(ev.startAt).format("YYYY年M月");
+      const arr = map.get(key);
+      if (arr) arr.push(ev);
+      else map.set(key, [ev]);
+    }
+    return Array.from(map.entries());
+  }, [events, timeFilter, categoryFilter]);
+
   if (events.length === 0) {
     return <EmptyState message="現在開催予定のイベントはありません" />;
   }
 
   return (
-    <div className="space-y-3">
-      {events.map((ev) => {
-        const start = dayjs(ev.startAt);
-        const end = dayjs(ev.endAt);
-        const catLabel = EVENT_CATEGORY_LABELS[ev.category] || ev.category;
-
-        return (
-          <div
-            key={ev.eventId}
-            onClick={() => router.push(`/events/${ev.eventId}`)}
-            className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 active:scale-[0.98] transition-transform cursor-pointer"
-          >
-            <div className="flex">
-              {ev.imageUrl ? (
-                <div className="w-24 flex-shrink-0 overflow-hidden bg-gray-100">
-                  <img src={ev.imageUrl} alt="" className="w-full h-full object-cover" />
-                </div>
-              ) : (
-                <div className="w-24 flex-shrink-0 bg-gradient-to-br from-[#A5C1C8] to-[#8BA8AF]" />
+    <div className="space-y-4">
+      {/* フィルタバー */}
+      <div className="space-y-2">
+        {/* 時期フィルタ */}
+        <div className="flex gap-2">
+          {([
+            { id: "upcoming", label: "今後" },
+            { id: "past", label: "過去" },
+            { id: "all", label: "すべて" },
+          ] as { id: TimeFilter; label: string }[]).map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setTimeFilter(f.id)}
+              className={clsx(
+                "text-[11px] px-3 py-1.5 rounded-full font-medium transition-colors",
+                timeFilter === f.id
+                  ? "bg-[#A5C1C8] text-white"
+                  : "bg-gray-100 text-gray-400 hover:bg-gray-200"
               )}
-              <div className="flex-1 p-3 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#A5C1C8]/20 text-[#231714]">
-                    {catLabel}
-                  </span>
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* カテゴリフィルタ */}
+        {categories.length > 1 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+            <button
+              onClick={() => setCategoryFilter("all")}
+              className={clsx(
+                "text-[10px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-colors flex-shrink-0",
+                categoryFilter === "all"
+                  ? "bg-[#231714] text-white"
+                  : "bg-gray-100 text-gray-400"
+              )}
+            >
+              すべて
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className={clsx(
+                  "text-[10px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-colors flex-shrink-0",
+                  categoryFilter === cat
+                    ? "bg-[#231714] text-white"
+                    : "bg-gray-100 text-gray-400"
+                )}
+              >
+                {EVENT_CATEGORY_LABELS[cat] || cat}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ソート説明 */}
+      <p className="text-[10px] text-gray-300">
+        {timeFilter === "upcoming"
+          ? "直近のイベントから表示"
+          : timeFilter === "past"
+          ? "最近のイベントから表示"
+          : "新しい順に表示"}
+      </p>
+
+      {/* タイムライン */}
+      {grouped.length === 0 ? (
+        <div className="text-center py-10">
+          <p className="text-sm text-gray-400">
+            {timeFilter === "upcoming"
+              ? "今後のイベントはありません"
+              : timeFilter === "past"
+              ? "過去のイベントはありません"
+              : "該当するイベントはありません"}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {grouped.map(([month, items]) => (
+            <div key={month}>
+              {/* 月ヘッダー */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-bold text-[#231714]">{month}</span>
+                <span className="text-[10px] text-gray-300">{items.length}件</span>
+              </div>
+
+              {/* タイムラインリスト */}
+              <div className="relative pl-5">
+                {/* 縦線 */}
+                <div className="absolute left-[5px] top-2 bottom-2 w-[1.5px] bg-gray-200" />
+
+                <div className="space-y-3">
+                  {items.map((ev, idx) => {
+                    const start = dayjs(ev.startAt);
+                    const end = dayjs(ev.endAt);
+                    const isPastEvent = end.isBefore(dayjs());
+                    const catLabel = EVENT_CATEGORY_LABELS[ev.category] || ev.category;
+                    const catColor = EVENT_CATEGORY_COLORS[ev.category] || EVENT_CATEGORY_COLORS.info;
+
+                    return (
+                      <div key={ev.eventId} className="relative">
+                        {/* ドット */}
+                        <div
+                          className={clsx(
+                            "absolute -left-5 top-3 w-[11px] h-[11px] rounded-full border-2 border-white z-10",
+                            isPastEvent ? "bg-gray-300" : "bg-[#A5C1C8]"
+                          )}
+                        />
+
+                        {/* カード */}
+                        <div
+                          onClick={() => router.push(`/events/${ev.eventId}`)}
+                          className={clsx(
+                            "bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 active:scale-[0.98] transition-transform cursor-pointer",
+                            isPastEvent && "opacity-60"
+                          )}
+                        >
+                          <div className="flex">
+                            {ev.imageUrl ? (
+                              <div className="w-20 flex-shrink-0 overflow-hidden bg-gray-100">
+                                <img src={ev.imageUrl} alt="" className="w-full h-full object-cover" />
+                              </div>
+                            ) : (
+                              <div className="w-20 flex-shrink-0 bg-gradient-to-br from-[#A5C1C8] to-[#8BA8AF] flex items-center justify-center">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" opacity="0.5">
+                                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                                  <path d="M16 2v4M8 2v4M3 10h18" />
+                                </svg>
+                              </div>
+                            )}
+                            <div className="flex-1 p-2.5 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className={clsx("text-[9px] px-1.5 py-0.5 rounded-full font-bold", catColor.bg, catColor.text)}>
+                                  {catLabel}
+                                </span>
+                                <span className="text-[10px] text-gray-300">
+                                  {start.format("M/D（ddd）")}
+                                </span>
+                              </div>
+                              <h3 className="text-[13px] font-bold text-[#231714] mt-1 leading-snug line-clamp-2">
+                                {ev.title}
+                              </h3>
+                              <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-400">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <circle cx="12" cy="12" r="10" />
+                                  <path d="M12 6v6l4 2" />
+                                </svg>
+                                <span>{start.format("HH:mm")}〜{end.format("HH:mm")}</span>
+                              </div>
+                              {ev.location && (
+                                <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+                                  {ev.location}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <h3 className="text-sm font-bold text-[#231714] mt-1 leading-snug line-clamp-2">
-                  {ev.title}
-                </h3>
-                <div className="flex items-center gap-1 mt-1.5 text-[11px] text-gray-400">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <path d="M16 2v4M8 2v4M3 10h18" />
-                  </svg>
-                  <span>
-                    {start.format("M/D（ddd）HH:mm")}〜{end.format("HH:mm")}
-                  </span>
-                </div>
-                <p className="text-[11px] text-gray-400 mt-0.5 truncate">
-                  {ev.location}
-                </p>
               </div>
             </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      )}
     </div>
   );
 }
