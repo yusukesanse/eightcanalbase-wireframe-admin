@@ -17,11 +17,14 @@ const QUEST_VALIDATION = {
   imageUrl:      { type: "url" as const, maxLength: 2000 },
   published:     { type: "boolean" as const },
   scheduledAt:   { type: "string" as const, maxLength: 50 },
+  startAt:       { type: "string" as const, maxLength: 50 },
+  endAt:         { type: "string" as const, maxLength: 50 },
 };
 
 const QUEST_UPDATE_FIELDS = [
   "title", "description", "requiredCount", "rewardPoints",
   "category", "imageUrl", "published", "scheduledAt",
+  "startAt", "endAt",
 ];
 
 /**
@@ -33,13 +36,26 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const toISO = (v: unknown): string | undefined => {
+      if (!v) return undefined;
+      if (v && typeof v === "object" && typeof (v as { toDate?: unknown }).toDate === "function") {
+        return ((v as { toDate: () => Date }).toDate()).toISOString();
+      }
+      return String(v);
+    };
+
     const db = getDb();
     const snap = await db.collection("quests").orderBy("createdAt", "desc").get();
-    const quests = snap.docs.map((doc) => ({
-      questId: doc.id,
-      ...doc.data(),
-      goodCount: doc.data().goodCount ?? 0,
-    }));
+    const quests = snap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        questId: doc.id,
+        ...data,
+        startAt: toISO(data.startAt),
+        endAt: toISO(data.endAt),
+        goodCount: data.goodCount ?? 0,
+      };
+    });
     return NextResponse.json({ quests });
   } catch (error) {
     console.error("[admin/quests] GET error:", error);
@@ -57,7 +73,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, description, requiredCount, rewardPoints, category, imageUrl, published, scheduledAt } = body;
+    const { title, description, requiredCount, rewardPoints, category, imageUrl, published, scheduledAt, startAt, endAt } = body;
 
     if (!title || !description || requiredCount === undefined || rewardPoints === undefined || !category) {
       return NextResponse.json({ error: "必須フィールドが不足しています" }, { status: 400 });
@@ -82,6 +98,8 @@ export async function POST(req: NextRequest) {
     };
     if (imageUrl) data.imageUrl = imageUrl;
     if (scheduledAt) data.scheduledAt = scheduledAt;
+    if (startAt) data.startAt = startAt;
+    if (endAt) data.endAt = endAt;
 
     const docRef = await db.collection("quests").add(data);
 
@@ -133,6 +151,12 @@ export async function PUT(req: NextRequest) {
 
     if (fields.scheduledAt === "" || fields.scheduledAt === null) {
       fields.scheduledAt = FieldValue.delete();
+    }
+    if (fields.startAt === "" || fields.startAt === null) {
+      fields.startAt = FieldValue.delete();
+    }
+    if (fields.endAt === "" || fields.endAt === null) {
+      fields.endAt = FieldValue.delete();
     }
     if (fields.requiredCount !== undefined) fields.requiredCount = Number(fields.requiredCount);
     if (fields.rewardPoints !== undefined) fields.rewardPoints = Number(fields.rewardPoints);

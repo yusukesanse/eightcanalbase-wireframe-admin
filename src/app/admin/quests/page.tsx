@@ -12,6 +12,8 @@ interface QuestItem {
   imageUrl?: string;
   published?: boolean;
   scheduledAt?: string;
+  startAt?: string;
+  endAt?: string;
   goodCount?: number;
 }
 
@@ -22,6 +24,8 @@ const EMPTY_FORM = {
   imageUrl: "",
   published: false,
   scheduledAt: "",
+  startAt: "",
+  endAt: "",
 };
 
 type PublishMode = "immediate" | "draft" | "scheduled";
@@ -84,6 +88,8 @@ export default function AdminQuestsPage() {
       imageUrl: q.imageUrl ?? "",
       published: q.published ?? false,
       scheduledAt: q.scheduledAt ? dayjs(q.scheduledAt).format("YYYY-MM-DDTHH:mm") : "",
+      startAt: q.startAt ? dayjs(q.startAt).format("YYYY-MM-DDTHH:mm") : "",
+      endAt: q.endAt ? dayjs(q.endAt).format("YYYY-MM-DDTHH:mm") : "",
     });
     setPublishMode(getPublishMode({
       ...EMPTY_FORM,
@@ -137,6 +143,8 @@ export default function AdminQuestsPage() {
         scheduledAt: publishMode === "scheduled" && form.scheduledAt
           ? new Date(form.scheduledAt).toISOString()
           : null,
+        startAt: form.startAt ? new Date(form.startAt).toISOString() : null,
+        endAt: form.endAt ? new Date(form.endAt).toISOString() : null,
       };
 
       let res: Response;
@@ -271,6 +279,7 @@ export default function AdminQuestsPage() {
               <tr className="bg-[#231714]/5 border-b border-[#231714]/5">
                 <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">タイトル</th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">カテゴリ</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">開催期間</th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">グッド</th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">ステータス</th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">予約時刻</th>
@@ -285,6 +294,11 @@ export default function AdminQuestsPage() {
                 >
                   <td className="px-6 py-3 font-medium text-[#231714]">{q.title}</td>
                   <td className="px-6 py-3 text-[#231714]/60">{q.category}</td>
+                  <td className="px-6 py-3 text-[#231714]/40 text-xs whitespace-nowrap">
+                    {q.startAt
+                      ? `${dayjs(q.startAt).format("M/D")}${q.endAt ? `〜${dayjs(q.endAt).format("M/D")}` : "〜"}`
+                      : "常時"}
+                  </td>
                   <td className="px-6 py-3">
                     <span className="inline-flex items-center gap-1 text-sm text-[#231714]">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="#BA7517" stroke="#BA7517" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -385,6 +399,30 @@ export default function AdminQuestsPage() {
                   className="w-full border border-[#231714]/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#231714] resize-none"
                   placeholder="クエストの説明"
                 />
+              </div>
+
+              {/* 開催期間 */}
+              <div>
+                <label className="block text-xs font-medium text-[#231714]/60 mb-2">開催期間（任意）</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-[#231714]/40 mb-1">開始日時</label>
+                    <DateTimePicker
+                      value={form.startAt}
+                      onChange={(v) => setForm({ ...form, startAt: v })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-[#231714]/40 mb-1">終了日時</label>
+                    <DateTimePicker
+                      value={form.endAt}
+                      onChange={(v) => setForm({ ...form, endAt: v })}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-[#231714]/40 mt-1">
+                  未設定の場合は「常時開催」として表示されます
+                </p>
               </div>
 
               {/* 画像アップロード */}
