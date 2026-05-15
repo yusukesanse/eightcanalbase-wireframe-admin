@@ -332,8 +332,10 @@ function EventsTab({
 }
 
 /* ═══════════════════════════════════════════
-   クエストタブ
+   クエストタブ（タイムライン型）
    ═══════════════════════════════════════════ */
+
+type QuestTimeFilter = "active" | "ended" | "all";
 
 function QuestsTab({
   quests,
@@ -342,52 +344,258 @@ function QuestsTab({
   quests: Quest[];
   router: ReturnType<typeof useRouter>;
 }) {
+  const [timeFilter, setTimeFilter] = useState<QuestTimeFilter>("active");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  // カテゴリ一覧を抽出
+  const categories = useMemo(() => {
+    const set = new Set(quests.map((q) => q.category));
+    return Array.from(set);
+  }, [quests]);
+
+  // フィルタリング・ソート・グルーピング
+  const { dated, undated, isEmpty } = useMemo(() => {
+    const today = dayjs().format("YYYY-MM-DD");
+
+    // 期間あり/なし分離
+    const withDate = quests.filter((q) => q.startAt);
+    const noDate = quests.filter((q) => !q.startAt);
+
+    // 時期フィルタ（期間ありのみ対象）
+    let filteredDated = withDate;
+    if (timeFilter === "active") {
+      filteredDated = withDate.filter((q) => {
+        const start = dayjs(q.startAt).format("YYYY-MM-DD");
+        const end = q.endAt ? dayjs(q.endAt).format("YYYY-MM-DD") : "9999-12-31";
+        return start <= today && end >= today;
+      });
+    } else if (timeFilter === "ended") {
+      filteredDated = withDate.filter((q) => {
+        const end = q.endAt ? dayjs(q.endAt).format("YYYY-MM-DD") : "9999-12-31";
+        return end < today;
+      });
+    }
+
+    // カテゴリフィルタ
+    if (categoryFilter !== "all") {
+      filteredDated = filteredDated.filter((q) => q.category === categoryFilter);
+    }
+    const filteredUndated = categoryFilter === "all"
+      ? noDate
+      : noDate.filter((q) => q.category === categoryFilter);
+
+    // ソート: 開催中→開始日新しい順、終了済み→終了日新しい順
+    const sortedDated = Array.from(filteredDated).sort((a, b) => {
+      if (timeFilter === "ended") {
+        return dayjs(b.endAt).unix() - dayjs(a.endAt).unix();
+      }
+      return dayjs(b.startAt!).unix() - dayjs(a.startAt!).unix();
+    });
+
+    // 月別グルーピング
+    const map = new Map<string, Quest[]>();
+    for (const q of sortedDated) {
+      const key = dayjs(q.startAt).format("YYYY年M月");
+      const arr = map.get(key);
+      if (arr) arr.push(q);
+      else map.set(key, [q]);
+    }
+
+    return {
+      dated: Array.from(map.entries()),
+      undated: filteredUndated,
+      isEmpty: sortedDated.length === 0 && filteredUndated.length === 0,
+    };
+  }, [quests, timeFilter, categoryFilter]);
+
   if (quests.length === 0) {
     return <EmptyState message="現在進行中のクエストはありません" />;
   }
 
   return (
-    <div className="space-y-3">
-      {quests.map((q) => (
-        <div
-          key={q.questId}
-          onClick={() => router.push(`/quests/${q.questId}`)}
-          className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 active:scale-[0.98] transition-transform cursor-pointer"
-        >
-          <div className="flex">
-            {q.imageUrl ? (
-              <div className="w-24 flex-shrink-0 overflow-hidden bg-gray-100">
-                <img src={q.imageUrl} alt="" className="w-full h-full object-cover" />
+    <div className="space-y-4">
+      {/* フィルタバー */}
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          {([
+            { id: "active", label: "開催中" },
+            { id: "ended", label: "終了" },
+            { id: "all", label: "すべて" },
+          ] as { id: QuestTimeFilter; label: string }[]).map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setTimeFilter(f.id)}
+              className={clsx(
+                "text-[11px] px-3 py-1.5 rounded-full font-medium transition-colors",
+                timeFilter === f.id
+                  ? "bg-[#A5C1C8] text-white"
+                  : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {categories.length > 1 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+            <button
+              onClick={() => setCategoryFilter("all")}
+              className={clsx(
+                "text-[10px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-colors flex-shrink-0",
+                categoryFilter === "all"
+                  ? "bg-[#231714] text-white"
+                  : "bg-gray-100 text-gray-400"
+              )}
+            >
+              すべて
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className={clsx(
+                  "text-[10px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-colors flex-shrink-0",
+                  categoryFilter === cat
+                    ? "bg-[#231714] text-white"
+                    : "bg-gray-100 text-gray-400"
+                )}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {isEmpty ? (
+        <div className="text-center py-10">
+          <p className="text-sm text-gray-400">
+            {timeFilter === "active"
+              ? "開催中のクエストはありません"
+              : timeFilter === "ended"
+              ? "終了したクエストはありません"
+              : "該当するクエストはありません"}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {/* 期間ありクエスト（タイムライン） */}
+          {dated.map(([month, items]) => (
+            <div key={month}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-bold text-[#231714]">{month}</span>
+                <span className="text-[10px] text-gray-300">{items.length}件</span>
               </div>
-            ) : (
-              <div className="w-24 flex-shrink-0 bg-gradient-to-br from-[#A5C1C8] to-[#8BA8AF] flex items-center justify-center">
-                <svg width="24" height="24" viewBox="0 0 20 20" fill="none">
-                  <path d="M10 2l1.8 5h5.2l-4.2 3.1 1.6 5L10 12l-4.4 3.1 1.6-5L3 7h5.2L10 2z" fill="white" opacity="0.8" />
-                </svg>
-              </div>
-            )}
-            <div className="flex-1 p-3 min-w-0">
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#A5C1C8]/25 text-[#231714]">
-                {q.category}
-              </span>
-              <h3 className="text-sm font-bold text-[#231714] mt-1 leading-snug line-clamp-2">
-                {q.title}
-              </h3>
-              <p className="text-[11px] text-gray-400 mt-1 line-clamp-1">
-                {q.description}
-              </p>
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-[10px] text-[#A5C1C8] font-medium">
-                  {q.rewardPoints}pt
-                </span>
-                <span className="text-[10px] text-gray-300">
-                  目標 {q.requiredCount}回
-                </span>
+
+              <div className="relative pl-5">
+                <div className="absolute left-[5px] top-2 bottom-2 w-[1.5px] bg-gray-200" />
+
+                <div className="space-y-3">
+                  {items.map((q) => {
+                    const today = dayjs().format("YYYY-MM-DD");
+                    const endDate = q.endAt ? dayjs(q.endAt).format("YYYY-MM-DD") : null;
+                    const isEnded = endDate ? endDate < today : false;
+
+                    return (
+                      <div key={q.questId} className="relative">
+                        <div
+                          className={clsx(
+                            "absolute -left-5 top-3 w-[11px] h-[11px] rounded-full border-2 border-white z-10",
+                            isEnded ? "bg-gray-300" : "bg-[#B0E401]"
+                          )}
+                        />
+                        <QuestTimelineCard quest={q} isEnded={isEnded} onClick={() => router.push(`/quests/${q.questId}`)} />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
+          ))}
+
+          {/* 期間なしクエスト */}
+          {undated.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-bold text-[#231714]">常時開催</span>
+                <span className="text-[10px] text-gray-300">{undated.length}件</span>
+              </div>
+              <div className="space-y-3">
+                {undated.map((q) => (
+                  <QuestTimelineCard key={q.questId} quest={q} isEnded={false} onClick={() => router.push(`/quests/${q.questId}`)} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── クエストタイムラインカード ─── */
+function QuestTimelineCard({
+  quest: q,
+  isEnded,
+  onClick,
+}: {
+  quest: Quest;
+  isEnded: boolean;
+  onClick: () => void;
+}) {
+  const startLabel = q.startAt ? dayjs(q.startAt).format("M/D") : null;
+  const endLabel = q.endAt ? dayjs(q.endAt).format("M/D") : null;
+  const periodLabel = startLabel
+    ? endLabel
+      ? `${startLabel}〜${endLabel}`
+      : `${startLabel}〜`
+    : null;
+
+  return (
+    <div
+      onClick={onClick}
+      className={clsx(
+        "bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 active:scale-[0.98] transition-transform cursor-pointer",
+        isEnded && "opacity-60"
+      )}
+    >
+      <div className="flex">
+        {q.imageUrl ? (
+          <div className="w-20 flex-shrink-0 overflow-hidden bg-gray-100">
+            <img src={q.imageUrl} alt="" className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className={clsx(
+            "w-20 flex-shrink-0 flex items-center justify-center",
+            isEnded ? "bg-gray-100" : "bg-gradient-to-br from-[#A5C1C8] to-[#8BA8AF]"
+          )}>
+            <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
+              <path d="M10 2l1.8 5h5.2l-4.2 3.1 1.6 5L10 12l-4.4 3.1 1.6-5L3 7h5.2L10 2z" fill={isEnded ? "#9CA3AF" : "white"} opacity="0.8" />
+            </svg>
+          </div>
+        )}
+        <div className="flex-1 p-2.5 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-[#A5C1C8]/25 text-[#231714]">
+              {q.category}
+            </span>
+            {periodLabel && (
+              <span className="text-[10px] text-gray-300">{periodLabel}</span>
+            )}
+          </div>
+          <h3 className="text-[13px] font-bold text-[#231714] mt-1 leading-snug line-clamp-2">
+            {q.title}
+          </h3>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[10px] text-[#A5C1C8] font-bold">{q.rewardPoints}pt</span>
+            <span className="text-[10px] text-gray-300">目標 {q.requiredCount}回</span>
+            {isEnded && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium">終了</span>
+            )}
           </div>
         </div>
-      ))}
+      </div>
     </div>
   );
 }

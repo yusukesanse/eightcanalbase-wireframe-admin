@@ -103,6 +103,8 @@ export interface Quest {
   imageUrl?: string;
   published?: boolean;
   scheduledAt?: string; // ISO8601: この日時になったら自動公開
+  startAt?: string;     // ISO8601: クエスト開始日
+  endAt?: string;       // ISO8601: クエスト終了日
 }
 
 export interface UserQuestProgress {

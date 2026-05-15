@@ -29,11 +29,22 @@ export async function GET(req: NextRequest) {
     totalPoints = userDoc.exists ? (userDoc.data()?.points ?? 0) : 0;
   }
 
+  // Firestore Timestamp → ISO文字列に変換
+  const toISO = (v: unknown): string | undefined => {
+    if (!v) return undefined;
+    if (v && typeof v === "object" && typeof (v as { toDate?: unknown }).toDate === "function") {
+      return ((v as { toDate: () => Date }).toDate()).toISOString();
+    }
+    return String(v);
+  };
+
   const quests = questsSnap.docs.map((doc) => {
-    const data = doc.data() as Omit<Quest, "questId">;
+    const data = doc.data();
     return {
       questId: doc.id,
       ...data,
+      startAt: toISO(data.startAt),
+      endAt: toISO(data.endAt),
       progress: userId ? progressMap.get(doc.id) : undefined,
       goodCount: (data as Record<string, unknown>).goodCount ?? 0,
     };
