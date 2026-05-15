@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { SKILL_CATEGORIES } from "@/types";
 
@@ -18,6 +18,10 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedSkill, setSelectedSkill] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function load() {
@@ -38,6 +42,17 @@ export default function MembersPage() {
     load();
   }, [router]);
 
+  /* サジェスト外クリックで閉じる */
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // 全メンバーが持つスキルのユニーク一覧（出現頻度順）
   const allSkills = useMemo(() => {
     const counts = new Map<string, number>();
@@ -49,6 +64,98 @@ export default function MembersPage() {
       .map(([skill]) => skill);
   }, [members]);
 
+  // 全メンバーの名前一覧
+  const allNames = useMemo(() => {
+    return members.map((m) => m.displayName);
+  }, [members]);
+
+  /* ── ひらがな↔カタカナ変換ユーティリティ ── */
+  function toKatakana(str: string) {
+    return str.replace(/[ぁ-ゖ]/g, (ch) =>
+      String.fromCharCode(ch.charCodeAt(0) + 0x60)
+    );
+  }
+  function toHiragana(str: string) {
+    return str.replace(/[ァ-ヶ]/g, (ch) =>
+      String.fromCharCode(ch.charCodeAt(0) - 0x60)
+    );
+  }
+  /** ひらがな・カタカナ両方で部分一致判定 */
+  function kanaIncludes(target: string, query: string) {
+    const t = target.toLowerCase();
+    const q = query.toLowerCase();
+    return (
+      t.includes(q) ||
+      t.includes(toKatakana(q)) ||
+      t.includes(toHiragana(q))
+    );
+  }
+
+  /* ── サジェスト候補を生成 ── */
+  const suggestions = useMemo(() => {
+    const q = search.trim();
+    if (!q) return [];
+
+    const results: { type: "skill" | "member"; label: string; count?: number }[] = [];
+
+    // スキル候補（ひらがな/カタカナ両対応の部分一致、出現数付き）
+    const skillCounts = new Map<string, number>();
+    members.forEach((m) =>
+      m.skills.forEach((s) => skillCounts.set(s, (skillCounts.get(s) || 0) + 1))
+    );
+    allSkills
+      .filter((s) => kanaIncludes(s, q))
+      .slice(0, 5)
+      .forEach((s) => {
+        results.push({ type: "skill", label: s, count: skillCounts.get(s) || 0 });
+      });
+
+    // メンバー名候補（ひらがな/カタカナ両対応）
+    allNames
+      .filter((n) => kanaIncludes(n, q))
+      .slice(0, 3)
+      .forEach((n) => {
+        results.push({ type: "member", label: n });
+      });
+
+    return results;
+  }, [search, members, allSkills, allNames]);
+
+  /* サジェスト選択ハンドラ */
+  const handleSelectSuggestion = useCallback((suggestion: { type: "skill" | "member"; label: string }) => {
+    if (suggestion.type === "skill") {
+      setSelectedSkill(suggestion.label);
+      setSearch("");
+    } else {
+      setSearch(suggestion.label);
+    }
+    setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+  }, []);
+
+  /* キーボードナビ */
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) =>
+        prev < suggestions.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) =>
+        prev > 0 ? prev - 1 : suggestions.length - 1
+      );
+    } else if (e.key === "Enter" && selectedSuggestionIndex >= 0) {
+      e.preventDefault();
+      handleSelectSuggestion(suggestions[selectedSuggestionIndex]);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+    }
+  }, [showSuggestions, suggestions, selectedSuggestionIndex, handleSelectSuggestion]);
+
   // フィルタリング
   const filtered = useMemo(() => {
     let list = members;
@@ -58,17 +165,31 @@ export default function MembersPage() {
     }
 
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = search.trim();
       list = list.filter(
         (m) =>
-          m.displayName.toLowerCase().includes(q) ||
-          m.catchphrase.toLowerCase().includes(q) ||
-          m.skills.some((s) => s.toLowerCase().includes(q))
+          kanaIncludes(m.displayName, q) ||
+          kanaIncludes(m.catchphrase, q) ||
+          m.skills.some((s) => kanaIncludes(s, q))
       );
     }
 
     return list;
   }, [members, selectedSkill, search]);
+
+  /* マッチ部分をハイライト */
+  function highlightMatch(text: string, query: string) {
+    if (!query) return text;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return text;
+    return (
+      <>
+        {text.slice(0, idx)}
+        <span className="text-[#A5C1C8] font-bold">{text.slice(idx, idx + query.length)}</span>
+        {text.slice(idx + query.length)}
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -79,26 +200,98 @@ export default function MembersPage() {
         </p>
       </header>
 
-      {/* 検索バー */}
+      {/* 検索バー + サジェスト */}
       <div className="bg-white px-5 pb-3 border-b border-gray-100">
-        <div className="relative">
+        <div className="relative" ref={searchRef}>
           <svg
             width="16"
             height="16"
             viewBox="0 0 16 16"
             fill="none"
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 z-10"
           >
             <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
             <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
           <input
+            ref={inputRef}
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setShowSuggestions(true);
+              setSelectedSuggestionIndex(-1);
+            }}
+            onFocus={() => {
+              if (search.trim()) setShowSuggestions(true);
+            }}
+            onKeyDown={handleKeyDown}
             placeholder="名前やスキルで検索..."
             className="w-full pl-9 pr-4 py-2.5 text-[13px] bg-gray-50 rounded-lg border border-gray-100 focus:outline-none focus:border-[#A5C1C8] transition-colors"
           />
+
+          {/* クリアボタン */}
+          {search && (
+            <button
+              onClick={() => {
+                setSearch("");
+                setShowSuggestions(false);
+                inputRef.current?.focus();
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 2l6 6M8 2l-6 6" stroke="#666" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+
+          {/* サジェストドロップダウン */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50">
+              {suggestions.map((s, i) => (
+                <button
+                  key={`${s.type}-${s.label}`}
+                  onClick={() => handleSelectSuggestion(s)}
+                  className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors ${
+                    i === selectedSuggestionIndex
+                      ? "bg-[#A5C1C8]/10"
+                      : "hover:bg-gray-50"
+                  }`}
+                >
+                  {/* アイコン */}
+                  {s.type === "skill" ? (
+                    <span className="w-6 h-6 rounded-full bg-[#A5C1C8]/15 flex items-center justify-center shrink-0">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1.5l1.76 3.52 3.84.56-2.8 2.72.64 3.84L8 10.44l-3.44 1.8.64-3.84-2.8-2.72 3.84-.56L8 1.5z" stroke="#A5C1C8" strokeWidth="1.2" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span className="w-6 h-6 rounded-full bg-[#B0E401]/15 flex items-center justify-center shrink-0">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                        <circle cx="8" cy="5" r="3" stroke="#7BA801" strokeWidth="1.2" />
+                        <path d="M2.5 14c0-3 2.5-5.5 5.5-5.5s5.5 2.5 5.5 5.5" stroke="#7BA801" strokeWidth="1.2" strokeLinecap="round" />
+                      </svg>
+                    </span>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] text-[#231714] truncate">
+                      {highlightMatch(s.label, search.trim())}
+                    </p>
+                    <p className="text-[10px] text-[#231714]/35">
+                      {s.type === "skill"
+                        ? `スキル · ${s.count}人が登録`
+                        : "メンバー"
+                      }
+                    </p>
+                  </div>
+                  {s.type === "skill" && (
+                    <span className="text-[10px] text-[#A5C1C8] shrink-0">タップで絞り込み</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -131,6 +324,24 @@ export default function MembersPage() {
                 {skill}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 選択中のスキルフィルタ表示 */}
+      {selectedSkill && (
+        <div className="bg-white px-5 py-2 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#231714]/40">絞り込み中:</span>
+            <button
+              onClick={() => setSelectedSkill("")}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] rounded-full bg-[#A5C1C8]/15 text-[#A5C1C8] font-medium"
+            >
+              {selectedSkill}
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
