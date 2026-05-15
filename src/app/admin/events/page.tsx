@@ -19,6 +19,14 @@ interface EventItem {
   goodCount?: number;
 }
 
+const EVENT_CATEGORIES = [
+  "ワークショップ",
+  "セミナー",
+  "カンファレンス",
+  "ミートアップ",
+  "交流会",
+] as const;
+
 const EMPTY_FORM: Omit<EventItem, "eventId" | "createdAt"> = {
   title: "",
   category: "",
@@ -53,6 +61,7 @@ export default function AdminEventsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [isOtherCategory, setIsOtherCategory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -77,6 +86,7 @@ export default function AdminEventsPage() {
     setEditing(null);
     setForm({ ...EMPTY_FORM });
     setPublishMode("draft");
+    setIsOtherCategory(false);
     setImageFile(null);
     setImagePreview("");
     setModalOpen(true);
@@ -84,6 +94,7 @@ export default function AdminEventsPage() {
 
   function openEdit(ev: EventItem) {
     setEditing(ev);
+    const isPreset = EVENT_CATEGORIES.includes(ev.category as typeof EVENT_CATEGORIES[number]);
     setForm({
       title: ev.title,
       category: ev.category,
@@ -96,6 +107,7 @@ export default function AdminEventsPage() {
       scheduledAt: ev.scheduledAt ? dayjs(ev.scheduledAt).format("YYYY-MM-DDTHH:mm") : "",
     });
     setPublishMode(getPublishMode(ev));
+    setIsOtherCategory(!isPreset && !!ev.category);
     setImageFile(null);
     setImagePreview(ev.imageUrl ?? "");
     setModalOpen(true);
@@ -382,13 +394,34 @@ export default function AdminEventsPage() {
 
               <div>
                 <label className="block text-xs font-medium text-[#231714]/60 mb-1">カテゴリ *</label>
-                <input
-                  type="text"
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  className="w-full border border-[#231714]/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#231714]"
-                  placeholder="例：ワークショップ / セミナー"
-                />
+                <select
+                  value={isOtherCategory ? "__other__" : form.category}
+                  onChange={(e) => {
+                    if (e.target.value === "__other__") {
+                      setIsOtherCategory(true);
+                      setForm({ ...form, category: "" });
+                    } else {
+                      setIsOtherCategory(false);
+                      setForm({ ...form, category: e.target.value });
+                    }
+                  }}
+                  className="w-full border border-[#231714]/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#231714] bg-white"
+                >
+                  <option value="" disabled>カテゴリを選択</option>
+                  {EVENT_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                  <option value="__other__">その他（自由記入）</option>
+                </select>
+                {isOtherCategory && (
+                  <input
+                    type="text"
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                    className="w-full border border-[#231714]/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#231714] mt-2"
+                    placeholder="カテゴリ名を入力"
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

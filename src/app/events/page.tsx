@@ -19,6 +19,13 @@ function saveGoodSet(s: Set<string>) { localStorage.setItem(GOOD_KEY, JSON.strin
 interface EventWithGood extends NufEvent { goodCount: number; liked: boolean }
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  // 新カテゴリ（日本語キー）
+  "ワークショップ": { bg: "bg-[#A5C1C8]/20", text: "text-[#231714]", label: "ワークショップ" },
+  "セミナー":       { bg: "bg-blue-100", text: "text-blue-700", label: "セミナー" },
+  "カンファレンス": { bg: "bg-purple-100", text: "text-purple-700", label: "カンファレンス" },
+  "ミートアップ":   { bg: "bg-amber-100", text: "text-amber-700", label: "ミートアップ" },
+  "交流会":         { bg: "bg-[#B0E401]/10", text: "text-[#231714]", label: "交流会" },
+  // 旧カテゴリ（後方互換）
   networking: { bg: "bg-[#A5C1C8]/20", text: "text-[#231714]", label: "ネットワーキング" },
   workshop:   { bg: "bg-[#A5C1C8]/25", text: "text-[#231714]", label: "ワークショップ" },
   social:     { bg: "bg-[#B0E401]/10", text: "text-[#231714]", label: "交流" },

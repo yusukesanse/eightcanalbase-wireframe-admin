@@ -90,6 +90,13 @@ export default function InfoPage() {
    ═══════════════════════════════════════════ */
 
 const EVENT_CATEGORY_LABELS: Record<string, string> = {
+  // 新カテゴリ（日本語キー）
+  "ワークショップ": "ワークショップ",
+  "セミナー": "セミナー",
+  "カンファレンス": "カンファレンス",
+  "ミートアップ": "ミートアップ",
+  "交流会": "交流会",
+  // 旧カテゴリ（後方互換）
   networking: "ネットワーキング",
   workshop: "ワークショップ",
   social: "交流",
@@ -97,6 +104,12 @@ const EVENT_CATEGORY_LABELS: Record<string, string> = {
 };
 
 const EVENT_CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  "ワークショップ": { bg: "bg-[#A5C1C8]/20", text: "text-[#231714]" },
+  "セミナー":       { bg: "bg-blue-100", text: "text-blue-700" },
+  "カンファレンス": { bg: "bg-purple-100", text: "text-purple-700" },
+  "ミートアップ":   { bg: "bg-amber-100", text: "text-amber-700" },
+  "交流会":         { bg: "bg-[#B0E401]/15", text: "text-[#231714]" },
+  // 旧カテゴリ（後方互換）
   networking: { bg: "bg-blue-100", text: "text-blue-700" },
   workshop:   { bg: "bg-[#A5C1C8]/20", text: "text-[#231714]" },
   social:     { bg: "bg-[#B0E401]/15", text: "text-[#231714]" },
