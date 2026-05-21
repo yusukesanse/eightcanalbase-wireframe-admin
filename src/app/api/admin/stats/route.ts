@@ -76,7 +76,10 @@ export async function GET(req: NextRequest) {
       const fid = r.facilityId || "unknown";
       facilityTotals[fid] = (facilityTotals[fid] || 0) + 1;
     }
+    // アクティブ施設のIDセット（存在しない施設は除外）
+    const activeFacilityIds = new Set(facilitiesSnap.docs.map((doc) => doc.id));
     const facilityIds = Object.entries(facilityTotals)
+      .filter(([id]) => activeFacilityIds.has(id))
       .sort((a, b) => b[1] - a[1])
       .map(([id]) => id);
 
@@ -156,11 +159,20 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.goodCount - a.goodCount)
       .slice(0, 5);
 
-    // ── 5. 施設別利用率（全期間） ──
-    const facilityUsage = facilityIds.map((fid) => ({
-      name: facilityNames[fid] || fid,
-      count: facilityTotals[fid] || 0,
-    }));
+    // ── 5. 施設別利用率（全期間、アクティブ施設のみ） ──
+    const allFacilityTotals: Record<string, number> = {};
+    for (const r of allReservations) {
+      const fid = r.facilityId || "unknown";
+      if (activeFacilityIds.has(fid)) {
+        allFacilityTotals[fid] = (allFacilityTotals[fid] || 0) + 1;
+      }
+    }
+    const facilityUsage = Object.entries(allFacilityTotals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([fid, count]) => ({
+        name: facilityNames[fid] || fid,
+        count,
+      }));
 
     // ── 6. コンテンツ統計 ──
     const publishedQuests = questsSnap.docs.filter((d) => d.data().published).length;
