@@ -137,13 +137,7 @@ function ConfirmContent() {
             onClick={() => router.push("/reservation")}
             className="w-full py-3 rounded-xl text-sm font-medium border border-gray-200 text-gray-600"
           >
-            続けて予約する
-          </button>
-          <button
-            onClick={() => router.push("/home")}
-            className="w-full py-2.5 rounded-xl text-xs text-gray-400"
-          >
-            ホームに戻る
+            戻る
           </button>
         </div>
       </div>
