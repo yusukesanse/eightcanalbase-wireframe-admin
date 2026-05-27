@@ -14,6 +14,13 @@ interface FacilityForm {
   openTime: string;
   closeTime: string;
   availableDays: number[];
+  // 予約時間制御
+  minDuration: string;       // 分（空文字=未設定）
+  fixedDuration: boolean;
+  prepTime: string;          // 分（空文字=未設定）
+  // 利用規約
+  requireTerms: boolean;
+  termsContent: string;
 }
 
 const DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -26,6 +33,11 @@ const EMPTY_FORM: FacilityForm = {
   openTime: "09:00",
   closeTime: "18:00",
   availableDays: [1, 2, 3, 4, 5],
+  minDuration: "",
+  fixedDuration: false,
+  prepTime: "",
+  requireTerms: false,
+  termsContent: "",
 };
 
 /* ───────── メインコンポーネント ───────── */
@@ -95,6 +107,11 @@ export default function CalendarsPage() {
       openTime: facility.openTime ?? "09:00",
       closeTime: facility.closeTime ?? "18:00",
       availableDays: facility.availableDays ?? [1, 2, 3, 4, 5],
+      minDuration: facility.minDuration ? String(facility.minDuration) : "",
+      fixedDuration: facility.fixedDuration ?? false,
+      prepTime: facility.prepTime ? String(facility.prepTime) : "",
+      requireTerms: facility.requireTerms ?? false,
+      termsContent: facility.termsContent ?? "",
     });
     setShowModal(true);
   }
@@ -122,17 +139,23 @@ export default function CalendarsPage() {
     setSuccess("");
 
     try {
+      // フォームデータを API 送信用に変換
+      const payload = {
+        ...form,
+        capacity: Number(form.capacity),
+        minDuration: form.minDuration ? Number(form.minDuration) : undefined,
+        prepTime: form.prepTime ? Number(form.prepTime) : undefined,
+        // termsContent は requireTerms=false なら送らない
+        termsContent: form.requireTerms ? form.termsContent : undefined,
+      };
+
       if (editingId) {
         // 更新
         const res = await fetch("/api/admin/facilities", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({
-            id: editingId,
-            ...form,
-            capacity: Number(form.capacity),
-          }),
+          body: JSON.stringify({ id: editingId, ...payload }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -145,7 +168,7 @@ export default function CalendarsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({ ...form, capacity: Number(form.capacity) }),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -313,6 +336,17 @@ export default function CalendarsPage() {
                         .map((d) => DAY_LABELS[d])
                         .join("・")}
                     </p>
+                    {(f.fixedDuration || f.minDuration || f.prepTime) && (
+                      <p className="text-xs text-[#231714]/60 mt-0.5">
+                        ⏱️ {f.fixedDuration ? "固定枠" : "最低利用"}{f.minDuration ? ` ${f.minDuration}分` : ""}
+                        {f.prepTime ? ` （準備${f.prepTime}分含む）` : ""}
+                      </p>
+                    )}
+                    {f.requireTerms && (
+                      <p className="text-xs text-[#231714]/60 mt-0.5">
+                        📋 利用規約あり
+                      </p>
+                    )}
                     <p className="text-xs text-[#231714]/40 mt-0.5 font-mono break-all">
                       📅 {f.calendarId}
                     </p>
@@ -364,14 +398,14 @@ export default function CalendarsPage() {
       {/* ───────── 追加/編集モーダル ───────── */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-visible">
-            <div className="px-6 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 shrink-0">
               <h2 className="text-lg font-semibold text-[#231714]">
                 {editingId ? "施設を編集" : "カレンダーを追加"}
               </h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
               {/* 施設名 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -501,6 +535,95 @@ export default function CalendarsPage() {
                 </div>
                 {form.availableDays.length === 0 && (
                   <p className="text-xs text-red-500 mt-1">1日以上選択してください</p>
+                )}
+              </div>
+
+              {/* ── 予約時間制御 ── */}
+              <div className="border-t border-gray-100 pt-4 mt-2">
+                <p className="text-xs font-medium text-gray-500 mb-3">予約時間制御（任意）</p>
+
+                {/* 固定枠トグル */}
+                <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.fixedDuration}
+                    onChange={(e) => setForm({ ...form, fixedDuration: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-[#231714] focus:ring-[#231714]"
+                  />
+                  <span className="text-sm text-gray-700">固定枠（開始時刻のみ選択）</span>
+                </label>
+
+                {/* 最低利用時間 / 固定枠時間 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      {form.fixedDuration ? "予約枠（分）" : "最低利用時間（分）"}
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={form.minDuration}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9]/g, "");
+                        setForm({ ...form, minDuration: v });
+                      }}
+                      placeholder={form.fixedDuration ? "例: 180" : "例: 60"}
+                      className="w-full px-3 py-2 border border-[#231714]/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#231714] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      準備時間（分）
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={form.prepTime}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9]/g, "");
+                        setForm({ ...form, prepTime: v });
+                      }}
+                      placeholder="例: 60"
+                      className="w-full px-3 py-2 border border-[#231714]/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#231714] focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                {form.fixedDuration && form.minDuration && (
+                  <p className="text-xs text-[#231714]/50 mt-1.5">
+                    {form.prepTime
+                      ? `利用${Number(form.minDuration) - Number(form.prepTime)}分 ＋ 準備${form.prepTime}分 = 合計${form.minDuration}分の枠`
+                      : `${form.minDuration}分の固定枠`}
+                  </p>
+                )}
+              </div>
+
+              {/* ── 利用規約 ── */}
+              <div className="border-t border-gray-100 pt-4 mt-2">
+                <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.requireTerms}
+                    onChange={(e) => setForm({ ...form, requireTerms: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-[#231714] focus:ring-[#231714]"
+                  />
+                  <span className="text-sm text-gray-700">利用規約への同意を必須にする</span>
+                </label>
+
+                {form.requireTerms && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      利用規約の内容
+                    </label>
+                    <textarea
+                      value={form.termsContent}
+                      onChange={(e) => setForm({ ...form, termsContent: e.target.value })}
+                      placeholder="利用規約の内容を入力してください..."
+                      rows={6}
+                      className="w-full px-3 py-2 border border-[#231714]/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#231714] focus:border-transparent resize-y"
+                    />
+                  </div>
                 )}
               </div>
 

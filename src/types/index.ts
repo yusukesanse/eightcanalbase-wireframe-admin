@@ -26,6 +26,13 @@ export interface Facility {
   openTime?: string;       // 利用開始時刻 "HH:MM"（デフォルト "09:00"）
   closeTime?: string;      // 利用終了時刻 "HH:MM"（デフォルト "18:00"）
   availableDays?: number[]; // 利用可能曜日 0=日〜6=土（デフォルト [1,2,3,4,5]）
+  // ── 予約時間制御 ──
+  minDuration?: number;    // 最低利用時間（分）。未設定=30分刻みで自由選択
+  fixedDuration?: boolean; // true=固定枠（開始時刻のみ選択、終了自動計算）
+  prepTime?: number;       // 準備時間（分）。予約枠には含むがユーザー利用時間には含まない
+  // ── 利用規約 ──
+  requireTerms?: boolean;  // true=予約前に利用規約への同意が必要
+  termsContent?: string;   // 利用規約の本文（改行対応）
   createdAt?: string;  // ISO8601
   updatedAt?: string;  // ISO8601
 }
@@ -43,6 +50,8 @@ export interface Reservation {
   endTime: string;     // HH:MM
   googleEventId: string;
   status: ReservationStatus;
+  termsAgreed?: boolean;    // 利用規約に同意済み
+  termsAgreedAt?: string;   // 同意日時 ISO8601
   createdAt: string;
 }
 

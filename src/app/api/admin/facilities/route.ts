@@ -21,6 +21,8 @@ const VALIDATION_RULES = {
 const ALLOWED_UPDATE_FIELDS = [
   "name", "type", "capacity", "calendarId", "active", "order",
   "openTime", "closeTime", "availableDays",
+  "minDuration", "fixedDuration", "prepTime",
+  "requireTerms", "termsContent",
 ];
 
 const TIME_REGEX = /^\d{2}:\d{2}$/;
@@ -123,6 +125,11 @@ export async function POST(req: NextRequest) {
     openTime: body.openTime ?? "09:00",
     closeTime: body.closeTime ?? "18:00",
     availableDays: body.availableDays ?? [1, 2, 3, 4, 5],
+    minDuration: body.minDuration,
+    fixedDuration: body.fixedDuration,
+    prepTime: body.prepTime,
+    requireTerms: body.requireTerms,
+    termsContent: body.termsContent,
   });
 
   return NextResponse.json({ facility }, { status: 201 });
@@ -166,6 +173,12 @@ export async function PUT(req: NextRequest) {
   const updateData = pickAllowedFields(body, ALLOWED_UPDATE_FIELDS);
   if (updateData.capacity) {
     updateData.capacity = Number(updateData.capacity);
+  }
+  if (updateData.minDuration !== undefined) {
+    updateData.minDuration = Number(updateData.minDuration);
+  }
+  if (updateData.prepTime !== undefined) {
+    updateData.prepTime = Number(updateData.prepTime);
   }
 
   await updateFacility(id, updateData);

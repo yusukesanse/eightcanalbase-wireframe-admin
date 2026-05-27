@@ -16,10 +16,11 @@ type Step = "confirm" | "loading" | "done" | "error";
 function ConfirmContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const facilityId = params.get("facilityId") ?? "";
-  const date       = params.get("date") ?? "";
-  const startTime  = params.get("startTime") ?? "";
-  const endTime    = params.get("endTime") ?? "";
+  const facilityId  = params.get("facilityId") ?? "";
+  const date        = params.get("date") ?? "";
+  const startTime   = params.get("startTime") ?? "";
+  const endTime     = params.get("endTime") ?? "";
+  const termsAgreed = params.get("termsAgreed") === "true";
 
   const [facility, setFacility] = useState<Facility | null>(null);
   const dateLabel = dayjs(date).format("M月D日（ddd）");
@@ -64,7 +65,7 @@ function ConfirmContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ facilityId, date, startTime, endTime, displayName }),
+        body: JSON.stringify({ facilityId, date, startTime, endTime, displayName, termsAgreed }),
       });
 
       const data = await res.json();
@@ -175,6 +176,7 @@ function ConfirmContent() {
           <DetailRow label="日付" value={dateLabel} />
           <DetailRow label="時間" value={`${startTime} 〜 ${endTime}`} />
           <DetailRow label="予約者" value={displayName || "読み込み中..."} />
+          {termsAgreed && <DetailRow label="利用規約" value="同意済み ✓" />}
         </div>
 
         <p className="text-xs text-gray-400 text-center">

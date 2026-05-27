@@ -74,6 +74,8 @@ export async function GET(req: NextRequest) {
           endTime: d.endTime,
           status: d.status,
           googleEventId: d.googleEventId ?? null,
+          termsAgreed: d.termsAgreed ?? false,
+          termsAgreedAt: d.termsAgreedAt ?? null,
           createdAt: d.createdAt,
         };
       })

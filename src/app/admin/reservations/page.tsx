@@ -17,6 +17,8 @@ interface Reservation {
   startTime: string;
   endTime: string;
   status: string;
+  termsAgreed: boolean;
+  termsAgreedAt: string | null;
   createdAt: string;
 }
 
@@ -295,6 +297,7 @@ export default function AdminReservationsPage() {
                   <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">施設</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">予約者</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">テナント</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">規約</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">状態</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">操作</th>
                 </tr>
@@ -332,6 +335,15 @@ export default function AdminReservationsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-3 text-[#231714]/60">{r.tenantName || "—"}</td>
+                      <td className="px-6 py-3">
+                        {r.termsAgreed ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600" title={r.termsAgreedAt ? `同意日時: ${dayjs(r.termsAgreedAt).format("M/D HH:mm")}` : ""}>
+                            同意済
+                          </span>
+                        ) : (
+                          <span className="text-xs text-[#231714]/30">—</span>
+                        )}
+                      </td>
                       <td className="px-6 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                           r.status === "confirmed" ? "bg-[#B0E401]/20 text-[#231714]" : "bg-gray-100 text-[#231714]/60"

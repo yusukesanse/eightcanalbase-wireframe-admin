@@ -172,6 +172,11 @@ export default function ReservationPage() {
     [today, maxDate, selectedFacility, weekData]
   );
 
+  // ─── 固定枠関連 ─────────────────────────────────────────────────────────────
+  const isFixedDuration = selectedFacility?.fixedDuration ?? false;
+  const fixedMinDuration = selectedFacility?.minDuration ?? 0; // 分
+  const facilityPrepTime = selectedFacility?.prepTime ?? 0;   // 分
+
   // ─── タイムスロット生成 ────────────────────────────────────────────────────
   const timeSlots = useMemo(() => {
     if (!selectedFacility) return [];
@@ -232,14 +237,55 @@ export default function ReservationPage() {
     [getMaxEndMin]
   );
 
+  /**
+   * 固定枠の場合、開始〜開始+minDuration の範囲に予約 or closeTime 超過がないか判定
+   */
+  const isFixedSlotAvailable = useCallback(
+    (startSlot: string): boolean => {
+      if (!isFixedDuration || !fixedMinDuration) return true;
+      const startMin = timeToMin(startSlot);
+      const endMin = startMin + fixedMinDuration;
+      const closeMin = timeToMin(selectedFacility?.closeTime ?? "18:00");
+      // 終了がcloseTimeを超える場合は不可
+      if (endMin > closeMin) return false;
+      // 範囲内に予約がないか
+      for (const b of daySlots) {
+        const bs = timeToMin(b.start);
+        const be = timeToMin(b.end);
+        // 予約範囲と重複チェック
+        if (startMin < be && endMin > bs) return false;
+      }
+      return true;
+    },
+    [isFixedDuration, fixedMinDuration, daySlots, selectedFacility?.closeTime]
+  );
+
   /** 開始時刻として選択不可かどうか */
   function isStartDisabled(slot: string) {
-    return isSlotBooked(slot) || slot === closeTimeSlot;
+    if (isSlotBooked(slot) || slot === closeTimeSlot) return true;
+    // 固定枠の場合、枠全体が収まるかチェック
+    if (isFixedDuration && !isFixedSlotAvailable(slot)) return true;
+    return false;
+  }
+
+  /** 分を "HH:MM" に変換 */
+  function minToTime(m: number): string {
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
   }
 
   // ─── 時間選択ハンドラ ──────────────────────────────────────────────────────
   function handleSlotClick(slot: string) {
     if (isPastSlot(slot)) return;
+
+    // 固定枠モード: 開始時刻のみ選択、終了は自動計算
+    if (isFixedDuration && fixedMinDuration) {
+      if (isStartDisabled(slot)) return;
+      setSelStart(slot);
+      setSelEnd(minToTime(timeToMin(slot) + fixedMinDuration));
+      return;
+    }
 
     if (!selStart || selEnd) {
       // 1回目または再選択 → 開始時刻をセット
@@ -286,6 +332,12 @@ export default function ReservationPage() {
       return "free" as const;
     }
 
+    // 固定枠モード: 終了は自動セットされるので、ここには来ないはずだが念のため
+    if (isFixedDuration) {
+      if (isStartDisabled(slot)) return "booked" as const;
+      return "free" as const;
+    }
+
     // 終了時刻選択モード
     if (sm > ss && isValidEndSlot(slot, selStart)) {
       return "free" as const; // 選択可能な終了時刻
@@ -296,15 +348,31 @@ export default function ReservationPage() {
     return "booked" as const; // 予約境界を超えた先は無効
   }
 
+  // ─── 利用規約 ──────────────────────────────────────────────────────────────
+  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const needsTerms = selectedFacility?.requireTerms ?? false;
+
+  // 施設変更時にリセット
+  useEffect(() => {
+    setTermsAgreed(false);
+  }, [selectedFacility?.id]);
+
   // ─── 予約確定へ ────────────────────────────────────────────────────────────
   function handleConfirm() {
     if (!selectedFacility || !selectedDate || !selStart || !selEnd) return;
-    router.push(
-      `/reservation/confirm?facilityId=${selectedFacility.id}&date=${selectedDate}&startTime=${selStart}&endTime=${selEnd}`
-    );
+    if (needsTerms && !termsAgreed) return;
+    const params = new URLSearchParams({
+      facilityId: selectedFacility.id,
+      date: selectedDate,
+      startTime: selStart,
+      endTime: selEnd,
+    });
+    if (termsAgreed) params.set("termsAgreed", "true");
+    router.push(`/reservation/confirm?${params.toString()}`);
   }
 
-  const canConfirm = !!(selectedFacility && selectedDate && selStart && selEnd);
+  const canConfirm = !!(selectedFacility && selectedDate && selStart && selEnd && (!needsTerms || termsAgreed));
   const meetingRooms = facilities.filter((f) => f.type === "meeting_room");
   const booths = facilities.filter((f) => f.type === "booth");
 
@@ -518,8 +586,26 @@ export default function ReservationPage() {
             ) : (
               <>
                 <p className="text-[10px] text-[#231714]/40 mb-2">
-                  {!selStart ? "開始時間をタップしてください" : !selEnd ? "終了時間をタップしてください" : `${selStart}〜${selEnd} を選択中`}
+                  {isFixedDuration
+                    ? (!selStart
+                      ? "開始時間をタップしてください（終了は自動設定されます）"
+                      : `${selStart}〜${selEnd} を選択中`)
+                    : (!selStart
+                      ? "開始時間をタップしてください"
+                      : !selEnd
+                        ? "終了時間をタップしてください"
+                        : `${selStart}〜${selEnd} を選択中`)}
                 </p>
+                {/* 固定枠の内訳表示 */}
+                {isFixedDuration && fixedMinDuration > 0 && (
+                  <div className="mb-2 px-3 py-2 bg-[#A5C1C8]/10 rounded-lg">
+                    <p className="text-[11px] text-[#231714]/70">
+                      {facilityPrepTime > 0
+                        ? `利用${fixedMinDuration - facilityPrepTime}分 ＋ 準備${facilityPrepTime}分 = 合計${fixedMinDuration}分の固定枠`
+                        : `${fixedMinDuration}分の固定枠`}
+                    </p>
+                  </div>
+                )}
                 <div className="grid grid-cols-4 gap-1.5">
                   {timeSlots.map((slot) => {
                     const state = getSlotState(slot);
@@ -549,9 +635,44 @@ export default function ReservationPage() {
         </>
       )}
 
+      {/* ── 利用規約モーダル ── */}
+      {showTermsModal && selectedFacility?.termsContent && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowTermsModal(false)}>
+          <div
+            className="bg-white rounded-t-2xl w-full max-h-[80vh] flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+              <h3 className="text-base font-bold text-[#231714]">利用規約</h3>
+              <button
+                onClick={() => setShowTermsModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#231714" strokeWidth="2" strokeLinecap="round">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto flex-1">
+              <div className="text-sm text-[#231714]/80 leading-relaxed whitespace-pre-wrap">
+                {selectedFacility.termsContent}
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 shrink-0">
+              <button
+                onClick={() => setShowTermsModal(false)}
+                className="w-full py-3 rounded-xl text-sm font-medium bg-[#231714] text-white"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── フローティングフッター ── */}
       <div className="sticky bottom-0 bg-white/80 backdrop-blur-lg border-t border-gray-100 px-5 py-3 safe-area-pb">
-        {canConfirm ? (
+        {selectedFacility && selectedDate && selStart && selEnd ? (
           <div className="space-y-2">
             {/* 選択サマリー */}
             <div className="flex items-center justify-between">
@@ -567,12 +688,47 @@ export default function ReservationPage() {
                   <p className="text-xs font-bold text-[#231714]">
                     {dayjs(selectedDate!).format("M/D（ddd）")} {selStart}〜{selEnd}
                   </p>
+                  {/* 固定枠の内訳 */}
+                  {isFixedDuration && facilityPrepTime > 0 && (
+                    <p className="text-[10px] text-[#231714]/40">
+                      利用{fixedMinDuration - facilityPrepTime}分 ＋ 準備{facilityPrepTime}分
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
+
+            {/* 利用規約チェックボックス */}
+            {needsTerms && (
+              <label className="flex items-start gap-2 px-1 py-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={termsAgreed}
+                  onChange={(e) => setTermsAgreed(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#B0E401] focus:ring-[#B0E401]"
+                />
+                <span className="text-xs text-[#231714]/70">
+                  <button
+                    type="button"
+                    onClick={() => setShowTermsModal(true)}
+                    className="text-[#A5C1C8] underline font-medium"
+                  >
+                    利用規約
+                  </button>
+                  に同意する
+                </span>
+              </label>
+            )}
+
             <button
               onClick={handleConfirm}
-              className="w-full py-3.5 rounded-2xl text-sm font-bold bg-[#B0E401] text-[#231714] active:scale-[0.98] transition-transform shadow-sm shadow-[#B0E401]/20"
+              disabled={!canConfirm}
+              className={clsx(
+                "w-full py-3.5 rounded-2xl text-sm font-bold transition-all",
+                canConfirm
+                  ? "bg-[#B0E401] text-[#231714] active:scale-[0.98] shadow-sm shadow-[#B0E401]/20"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              )}
             >
               予約内容を確認する
             </button>
