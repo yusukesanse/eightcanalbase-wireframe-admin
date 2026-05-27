@@ -153,9 +153,9 @@ export async function PUT(req: NextRequest) {
   }
 
   // type のバリデーション（指定時のみ）
-  if (body.type && body.type !== "meeting_room" && body.type !== "booth") {
+  if (body.type && body.type !== "meeting_room" && body.type !== "booth" && body.type !== "activity") {
     return NextResponse.json(
-      { error: "type は 'meeting_room' または 'booth' でなければなりません" },
+      { error: "type は 'meeting_room', 'booth', 'activity' のいずれかでなければなりません" },
       { status: 400 }
     );
   }
