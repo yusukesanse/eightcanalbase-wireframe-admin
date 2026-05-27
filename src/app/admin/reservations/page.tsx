@@ -294,12 +294,12 @@ export default function AdminReservationsPage() {
               <thead>
                 <tr className="bg-[#231714]/5 border-b border-[#231714]/5">
                   <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60 whitespace-nowrap">日時</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">施設</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">予約者</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">テナント</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">規約</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">状態</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60">操作</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60 whitespace-nowrap">施設</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60 whitespace-nowrap">予約者</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60 whitespace-nowrap">テナント</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60 whitespace-nowrap">規約</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60 whitespace-nowrap">状態</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-[#231714]/60 whitespace-nowrap">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -316,8 +316,8 @@ export default function AdminReservationsPage() {
                           <span className="ml-2 px-1.5 py-0.5 bg-[#A5C1C8]/30 text-[#A5C1C8] text-xs rounded-full font-medium">今日</span>
                         )}
                       </td>
-                      <td className="px-6 py-3 text-[#231714]/60">{r.facilityName}</td>
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 text-[#231714]/60 whitespace-nowrap">{r.facilityName}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {r.pictureUrl ? (
                             <img
@@ -334,35 +334,35 @@ export default function AdminReservationsPage() {
                           <span className="font-medium text-[#231714]">{r.displayName}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-3 text-[#231714]/60">{r.tenantName || "—"}</td>
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 text-[#231714]/60 whitespace-nowrap">{r.tenantName || "—"}</td>
+                      <td className="px-6 py-3 whitespace-nowrap">
                         {r.termsAgreed ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600" title={r.termsAgreedAt ? `同意日時: ${dayjs(r.termsAgreedAt).format("M/D HH:mm")}` : ""}>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 whitespace-nowrap" title={r.termsAgreedAt ? `同意日時: ${dayjs(r.termsAgreedAt).format("M/D HH:mm")}` : ""}>
                             同意済
                           </span>
                         ) : (
                           <span className="text-xs text-[#231714]/30">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
                           r.status === "confirmed" ? "bg-[#B0E401]/20 text-[#231714]" : "bg-gray-100 text-[#231714]/60"
                         }`}>
                           {r.status === "confirmed" ? "確定" : "キャンセル済"}
                         </span>
                       </td>
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 whitespace-nowrap">
                         {r.status === "confirmed" && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
                             <button
                               onClick={() => openEdit(r)}
-                              className="px-2.5 py-1.5 text-xs rounded-lg border border-[#A5C1C8]/40 text-[#A5C1C8] hover:bg-[#A5C1C8]/20 transition-colors"
+                              className="px-2.5 py-1.5 text-xs rounded-lg border border-[#A5C1C8]/40 text-[#A5C1C8] hover:bg-[#A5C1C8]/20 transition-colors whitespace-nowrap"
                             >
                               編集
                             </button>
                             <button
                               onClick={() => setCancelTarget(r)}
-                              className="px-2.5 py-1.5 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                              className="px-2.5 py-1.5 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap"
                             >
                               キャンセル
                             </button>
