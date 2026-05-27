@@ -139,6 +139,12 @@ function ConfirmContent() {
           >
             続けて予約する
           </button>
+          <button
+            onClick={() => router.push("/home")}
+            className="w-full py-2.5 rounded-xl text-xs text-gray-400"
+          >
+            ホームに戻る
+          </button>
         </div>
       </div>
     );
