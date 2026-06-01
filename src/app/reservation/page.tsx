@@ -696,26 +696,22 @@ export default function ReservationPage() {
                 prose-strong:text-[#231714]">
                 <ReactMarkdown>{selectedFacility.termsContent}</ReactMarkdown>
               </div>
-            </div>
-            <div className="px-5 py-3 border-t border-gray-100 shrink-0 space-y-2">
-              {!termsRead && (
-                <p className="text-[10px] text-center text-[#231714]/40">最後までスクロールしてご確認ください</p>
-              )}
-              {termsRead ? (
-                <button
-                  onClick={() => { setTermsAgreed(true); setShowTermsModal(false); }}
-                  className="w-full py-3 rounded-xl text-sm font-medium bg-[#B0E401] text-[#231714]"
-                >
-                  利用規約に同意する
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="w-full py-3 rounded-xl text-sm font-medium bg-gray-200 text-gray-400 cursor-not-allowed"
-                >
-                  下までスクロールしてください
-                </button>
-              )}
+
+              {/* 規約末尾の同意ボタン（スクロール完了で表示） */}
+              <div className="mt-6 mb-2">
+                {termsRead ? (
+                  <button
+                    onClick={() => { setTermsAgreed(true); setShowTermsModal(false); }}
+                    className="w-full py-3 rounded-xl text-sm font-medium bg-[#B0E401] text-[#231714]"
+                  >
+                    利用規約に同意する
+                  </button>
+                ) : (
+                  <p className="text-[11px] text-center text-[#231714]/30 py-3">
+                    ↓ 最後までスクロールしてください
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
