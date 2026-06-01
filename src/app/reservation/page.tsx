@@ -351,13 +351,24 @@ export default function ReservationPage() {
 
   // ─── 利用規約 ──────────────────────────────────────────────────────────────
   const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsRead, setTermsRead] = useState(false);   // 規約を最後までスクロールしたか
   const [showTermsModal, setShowTermsModal] = useState(false);
   const needsTerms = selectedFacility?.requireTerms ?? false;
 
   // 施設変更時にリセット
   useEffect(() => {
     setTermsAgreed(false);
+    setTermsRead(false);
   }, [selectedFacility?.id]);
+
+  /** 規約モーダルのスクロール検知 */
+  function handleTermsScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    // 下端まで20px以内でスクロール完了とみなす
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 20) {
+      setTermsRead(true);
+    }
+  }
 
   // ─── 予約確定へ ────────────────────────────────────────────────────────────
   function handleConfirm() {
@@ -676,7 +687,7 @@ export default function ReservationPage() {
                 </svg>
               </button>
             </div>
-            <div className="px-5 py-4 overflow-y-auto flex-1">
+            <div className="px-5 py-4 overflow-y-auto flex-1" onScroll={handleTermsScroll}>
               <div className="prose prose-sm max-w-none text-[#231714]/80
                 prose-headings:text-[#231714] prose-headings:font-bold prose-headings:mt-4 prose-headings:mb-2
                 prose-h2:text-base prose-h3:text-sm
@@ -686,12 +697,21 @@ export default function ReservationPage() {
                 <ReactMarkdown>{selectedFacility.termsContent}</ReactMarkdown>
               </div>
             </div>
-            <div className="px-5 py-3 border-t border-gray-100 shrink-0">
+            <div className="px-5 py-3 border-t border-gray-100 shrink-0 space-y-2">
+              {!termsRead && (
+                <p className="text-[10px] text-center text-[#231714]/40">最後までスクロールしてご確認ください</p>
+              )}
               <button
-                onClick={() => setShowTermsModal(false)}
-                className="w-full py-3 rounded-xl text-sm font-medium bg-[#231714] text-white"
+                onClick={() => { if (termsRead) { setShowTermsModal(false); } }}
+                disabled={!termsRead}
+                className={clsx(
+                  "w-full py-3 rounded-xl text-sm font-medium transition-colors",
+                  termsRead
+                    ? "bg-[#231714] text-white"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                )}
               >
-                閉じる
+                {termsRead ? "確認しました" : "規約を確認中..."}
               </button>
             </div>
           </div>
@@ -728,12 +748,16 @@ export default function ReservationPage() {
 
             {/* 利用規約チェックボックス */}
             {needsTerms && (
-              <label className="flex items-start gap-2 px-1 py-1 cursor-pointer">
+              <label className={clsx(
+                "flex items-start gap-2 px-1 py-1",
+                termsRead ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+              )}>
                 <input
                   type="checkbox"
                   checked={termsAgreed}
+                  disabled={!termsRead}
                   onChange={(e) => setTermsAgreed(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#B0E401] focus:ring-[#B0E401]"
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#B0E401] focus:ring-[#B0E401] disabled:opacity-40"
                 />
                 <span className="text-xs text-[#231714]/70">
                   <button
@@ -743,7 +767,7 @@ export default function ReservationPage() {
                   >
                     利用規約
                   </button>
-                  に同意する
+                  {termsRead ? "に同意する" : "を確認してください"}
                 </span>
               </label>
             )}
